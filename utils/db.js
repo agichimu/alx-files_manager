@@ -1,5 +1,3 @@
-// File: utils/db.js
-
 import { MongoClient } from 'mongodb';
 
 class DBClient {
@@ -8,27 +6,24 @@ class DBClient {
     const port = process.env.DB_PORT || 27017;
     const database = process.env.DB_DATABASE || 'files_manager';
 
-    this.client = new MongoClient(`mongodb://${host}:${port}`, { useNewUrlParser: true });
-    this.client.connect((err) => {
-      if (err) console.log(err);
-      else console.log('Database connection established');
-    });
+    this.client = new MongoClient(`mongodb://${host}:${port}`, { useUnifiedTopology: true });
+    this.client.connect()
+      .then(() => {
+        this.db = this.client.db(database);
+      })
+      .catch((err) => console.log('MongoDB Client Error', err));
   }
 
   isAlive() {
-    return this.client.isConnected();
+    return !!this.db;
   }
 
   async nbUsers() {
-    const collection = this.client.db().collection('users');
-    const count = await collection.countDocuments();
-    return count;
+    return this.db.collection('users').countDocuments();
   }
 
   async nbFiles() {
-    const collection = this.client.db().collection('files');
-    const count = await collection.countDocuments();
-    return count;
+    return this.db.collection('files').countDocuments();
   }
 }
 
