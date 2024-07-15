@@ -1,16 +1,12 @@
-import fs from 'fs';
-import { promisify } from 'util';
-import mime from 'mime-types';
-import { v4 as uuidv4 } from 'uuid';
-import redisClient from '../utils/redis';
-import dbClient from '../utils/db';
 import { ObjectId } from 'mongodb';
-
-const writeFileAsync = promisify(fs.writeFile);
-const mkdirAsync = promisify(fs.mkdir);
+import dbClient from '../utils/db';
+import redisClient from '../utils/redis';
+import mime from 'mime-types';
+import fs from 'fs';
+import path from 'path';
 
 class FilesController {
-  static async postUpload(req, res) {
+   static async postUpload(req, res) {
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
 
@@ -48,22 +44,24 @@ class FilesController {
   }
 
   static async getShow(req, res) {
+    const fileId = req.params.id;
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
 
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    const fileId = req.params.id;
-    const file = await dbClient.getFileById(fileId);
+    const file = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId), userId: ObjectId(userId) });
 
-    if (!file || file.userId.toString() !== userId) {
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
 
     return res.status(200).json(file);
   }
 
-  static async getIndex(req, res) {
+static async getIndex(req, res) {
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
 
@@ -81,16 +79,19 @@ class FilesController {
 
     return res.status(200).json(files);
   }
+
   static async putPublish(req, res) {
+    const fileId = req.params.id;
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
 
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    const fileId = req.params.id;
-    const file = await dbClient.getFileById(fileId);
+    const file = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId), userId: ObjectId(userId) });
 
-    if (!file || file.userId.toString() !== userId) {
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -98,21 +99,24 @@ class FilesController {
       { _id: ObjectId(fileId) },
       { $set: { isPublic: true } }
     );
-    
-    const updatedFile = await dbClient.getFileById(fileId);
+
+    const updatedFile = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId) });
+
     return res.status(200).json(updatedFile);
   }
 
   static async putUnpublish(req, res) {
+    const fileId = req.params.id;
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
 
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    const fileId = req.params.id;
-    const file = await dbClient.getFileById(fileId);
+    const file = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId), userId: ObjectId(userId) });
 
-    if (!file || file.userId.toString() !== userId) {
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -121,14 +125,16 @@ class FilesController {
       { $set: { isPublic: false } }
     );
 
-    const updatedFile = await dbClient.getFileById(fileId);
+    const updatedFile = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId) });
+
     return res.status(200).json(updatedFile);
   }
+
   static async getFile(req, res) {
     const fileId = req.params.id;
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
-    
+
     const file = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId) });
 
     if (!file) {
