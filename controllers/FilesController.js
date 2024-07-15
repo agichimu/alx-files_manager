@@ -124,6 +124,37 @@ class FilesController {
     const updatedFile = await dbClient.getFileById(fileId);
     return res.status(200).json(updatedFile);
   }
+  static async getFile(req, res) {
+    const fileId = req.params.id;
+    const token = req.header('X-Token');
+    const userId = await redisClient.get(`auth_${token}`);
+    
+    const file = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId) });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    if (!file.isPublic) {
+      if (!userId || userId !== file.userId.toString()) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+    }
+
+    if (file.type === 'folder') {
+      return res.status(400).json({ error: "A folder doesn't have content" });
+    }
+
+    const filePath = path.join(file.localPath);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const mimeType = mime.lookup(file.name);
+    res.setHeader('Content-Type', mimeType);
+    const fileContent = fs.readFileSync(filePath);
+    return res.status(200).send(fileContent);
+  }
 }
 
 export default FilesController;
